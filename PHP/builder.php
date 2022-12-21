@@ -25,12 +25,13 @@
     echo "\033[01;32m//* ******************************************************************* *//\n\n\033[0m";
 
     // Init
-    $logFile = "opa_builder.log"; 
+    $logFile = "opa_builder.log";
     $brand = "";
     $dlnr = "";
     $reference = "";
 
-    // SQL connect
+    // ****************************************** //
+    // ************** SQL connect *************** //
     try {
         $DbMapping = new PDO(
             'mysql:host='.$DbMappingBrandHost.';port='.$DbMappingBrandPort.';dbname='.$DbMappingBrandName.';charset=utf8',
@@ -47,7 +48,8 @@
         die("Erreur : " . $error->getMessage());
     };
 
-    // Préparation des fichiers CSV
+    // ****************************************** //
+    // ***** Préparation des fichiers CSV ******* //
     $fpCompatibilityBuild = fopen("./export/compatibility_build.csv", 'w');
     fputcsv($fpCompatibilityBuild, array("référence", "ktype", "id", "marque", "Cross référence"), ";", "\"");
 
@@ -57,7 +59,8 @@
     $fpBrandNotMatched = fopen('./export/brand_not_matched.csv', 'w');
     fputcsv($fpBrandNotMatched, array("id", "référence", "marque"), ";", "\"");
 
-    // Démarrage du script
+    // ****************************************** //
+    // ********** Démarrage du script *********** //
     if (file_exists($logFile)) {
         unlink($logFile);
     };
@@ -117,8 +120,8 @@
                     }
 
                 } else {
-
-                    // get Main Info
+                    // ****************************************** //
+                    // ************ DEBUT - Main Info *********** //
                     include "./SQL/getMainInfo.php";
                     $stmtMainInfo = $DbTecDocFull->prepare($getMainInfo);
                     $stmtMainInfo->execute();
@@ -130,13 +133,46 @@
                         continue;
                     }
 
-                    // get Images
+                    // ****************************************** //
+                    // ************ DEBUT - Cryteries *********** //
+                    include "./SQL/getCryteries.php";
+                    $stmtCryteries = $DbTecDocFull->prepare($getCryteriesProduct);
+                    $stmtCryteries->execute();
+                    $getCryteries = $stmtCryteries->fetchAll(PDO::FETCH_ASSOC);
+
+                    if(!empty($getCryteries)) {
+                        $getCryteriesResult = <<<HTML
+                        <p>
+                        HTML;
+    
+                        foreach ($getCryteries as $key => $value) {
+                            if (is_array($value)) {
+                                foreach ($value as $key => $value) {
+                                    $getCryteriesResult.= <<<HTML
+                                    $value<br>
+                                    HTML;
+                                }
+                            }
+                        }
+    
+                        $getCryteriesResult.= <<<HTML
+                        </p>
+                        HTML;
+    
+                        $getCryteriesResult = substr_replace($getCryteriesResult, "", -8, 4);
+                    } else {
+                        $getCryteriesResult = "";
+                    }
+
+                    // ****************************************** //
+                    // ************* DEBUT - Images ************* //
                     include "./SQL/getImages.php";
                     $stmtImages = $DbTecDocFull->prepare($getImages);
                     $stmtImages->execute();
                     $getImages = $stmtImages->fetchAll(PDO::FETCH_ASSOC);
 
-                    // get Ktype
+                    // ****************************************** //
+                    // ************** DEBUT - Ktype ************* //
                     include "./SQL/getKtype.php";
                     $stmtKtype = $DbTecDocFull->prepare($getKtype);
                     $stmtKtype->execute();
@@ -229,13 +265,17 @@
                     $result[0]["ean13"] = $getMainInfo[0]["ean13"];
                     $result[0]["caract_marque"] = $getCaractBrand;
                     $result[0]["nom"] = $getMainInfo[0]["nom"] . " pour " . ucfirst(strtolower($result[0]["caract_marque"]));
-                    $result[0]["STANDARD_GROUP"] = $getMainInfo[0]["STANDARD_GROUP"];
-                    $result[0]["ASSEMBLY_GROUP"] = $getMainInfo[0]["ASSEMBLY_GROUP"];
-                    $result[0]["PURPOSE_GROUP"] = $getMainInfo[0]["PURPOSE_GROUP"];
+                    $result[0]["standard_group"] = $getMainInfo[0]["STANDARD_GROUP"];
+                    $result[0]["assembly_group"] = $getMainInfo[0]["ASSEMBLY_GROUP"];
+                    $result[0]["purpose_group"] = $getMainInfo[0]["PURPOSE_GROUP"];
                     $result[0]["images"] = $getImages[0]["images"];
                     $result[0]["ktype"] = $getKtype[0]["ktype"];
+                    $result[0]["description_courte"] = $getCryteriesResult;
                     $result[0]["description_longue"] = preg_replace("# {2,}#"," ",preg_replace("#(\r\n|\n\r|\n|\r)#"," ",$getCrossRef . $getCompatibility));
-
+                    $result[0]["tva"] = "20";
+                    $result[0]["stock_avance"] = "2";
+                    $result[0]["message_si_stock"] = "En stock";
+                    $result[0]["message_si_hors_stock"] = "Livraison entre 2 à 4 jours";
                     //print_r($data);die;
                     //print_r($result);die;
 
