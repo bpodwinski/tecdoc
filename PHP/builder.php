@@ -16,9 +16,11 @@
 
     // Global config
     $langId = 6;
-    $csvPath = "./import/ajs.csv";
+    $csvPath = "./import/opa.csv";
     $pathToImage = "http://rzrb9611.odns.fr/img/";
     $pathToPdf = "http://rzrb9611.odns.fr/pdf/";
+    $limitNom = 128;
+    $limitUrl = 128;
 
     echo "\033[01;32m//* ******************************************************************* *//\n\033[0m";
     echo "\033[01;32m//* *********************** LANCEMENT DU SCRIPT *********************** *//\n\033[0m";
@@ -48,10 +50,41 @@
         die("Erreur : " . $error->getMessage());
     };
 
+    function generateSeoURL($string, $limit = 0) {
+        $separator = "-";
+
+        if ($limit != 0) {
+            $string = substr($string, 0, $limit);
+        }
+     
+        $quoteSeparator = preg_quote($separator, '#');
+
+        $search  = array('À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Ç', 'È', 'É', 'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï', 'Ò', 'Ó', 'Ô', 'Õ', 'Ö', 'Ù', 'Ú', 'Û', 'Ü', 'Ý', 'à', 'á', 'â', 'ã', 'ä', 'å', 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð', 'ò', 'ó', 'ô', 'õ', 'ö', 'ù', 'ú', 'û', 'ü', 'ý', 'ÿ');
+        $replace = array('A', 'A', 'A', 'A', 'A', 'A', 'C', 'E', 'E', 'E', 'E', 'I', 'I', 'I', 'I', 'O', 'O', 'O', 'O', 'O', 'U', 'U', 'U', 'U', 'Y', 'a', 'a', 'a', 'a', 'a', 'a', 'c', 'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i', 'o', 'o', 'o', 'o', 'o', 'o', 'u', 'u', 'u', 'u', 'y', 'y');
+
+        $string = str_replace($search, $replace, $string);
+     
+        $trans = array( 
+            "&.+?;" => "", 
+            "[^\w\d _-]" => "", 
+            "\s+" => $separator, 
+            "(".$quoteSeparator.")+"=> $separator 
+        ); 
+     
+        $string = strip_tags($string); 
+        foreach ($trans as $key => $val){ 
+            $string = preg_replace('#'.$key.'#iu', $val, $string); 
+        } 
+     
+        $string = strtolower($string); 
+     
+        return trim(trim($string, $separator)); 
+    }
+
     // ****************************************** //
     // ***** Préparation des fichiers CSV ******* //
     $fpCompatibilityBuild = fopen("./export/compatibility_build.csv", 'w');
-    fputcsv($fpCompatibilityBuild, array("référence", "ktype", "id", "marque", "Cross référence"), ";", "\"");
+    fputcsv($fpCompatibilityBuild, array("ID", "Marque", "Modèle", "Motorisation"), ";");
 
     $RefNotFound = fopen("./export/ref_not_found.csv", 'w');
     fputcsv($RefNotFound, array("id", "référence", "marque"), ";", "\"");
@@ -67,11 +100,12 @@
     
     $row = 1;
     $flag = true;
+    $flag2 = true;
     if (($handle = fopen($csvPath, "r")) !== FALSE) {
         $lineCount = count(file($csvPath)) - 1;
 
         while (($data = fgetcsv($handle, 0, ";", "\"")) !== FALSE) {
-            if ($flag) {$flag = FALSE; continue;}
+            if ($flag) {$flag = false; continue;}
             $id = $data[0];
             $reference = $data[1];
             $marque = $data[2];
@@ -195,20 +229,20 @@
                     $rowsCrossRefRaw = $stmtCrossRef->fetchAll(PDO::FETCH_ASSOC);
 
                     $getCrossRef = <<<HTML
-                    <div class="cross_ref"><br/>
-                    <h4>Références équivalentes</h4><br/>
-                    <ul><br/>
+                    <div class="cross_ref">
+                    <h4>Références équivalentes</h4>
+                    <ul>
                     HTML;
                     foreach ($rowsCrossRefRaw as $value) {
                         $CrossRefBrand = $value["CROSS_BRAND"];
                         $CrossRefArtnr = $value["CROSS_ARTNR"];
                         $getCrossRef.= <<<HTML
-                        <li><h5>$CrossRefBrand</h5> $CrossRefArtnr</li><br/>
+                        <li><h5>$CrossRefBrand</h5> $CrossRefArtnr</li>
                         HTML;
                     }
                     $getCrossRef.= <<<HTML
-                    </ul><br/>
-                    </div><br/>
+                    </ul>
+                    </div>
                     HTML;
 
                     // ****************************************** //
@@ -219,9 +253,9 @@
                     $rowsCompatibilityRaw = $stmtCompatibility->fetchAll(PDO::FETCH_ASSOC);
 
                     $getCompatibility = <<<HTML
-                    <div class="compatability_vehicule"><br/>
-                    <h4>Compatible avec les véhicules</h4><br/>
-                    <ul><br/>
+                    <div class="compatability_vehicule">
+                    <h4>Compatible avec les véhicules</h4>
+                    <ul>
                     HTML;
 
                     foreach ($rowsCompatibilityRaw as $value) {
@@ -236,20 +270,32 @@
                         $rowsCompatibilitPs = $value["PS"];
                         $rowsCompatibilityCcm = $value["CCM"];
                         $getCompatibility.= <<<HTML
-                        <li>$rowsCompatibilityManufacturer $rowsCompatibilityModel ($rowsCompatibilityBjvon à $rowsCompatibilityBjbis, $rowsCompatibilitPs ch, $rowsCompatibilityCcm cm3)</li><br/>
+                        <li>$rowsCompatibilityManufacturer $rowsCompatibilityModel ($rowsCompatibilityBjvon à $rowsCompatibilityBjbis, $rowsCompatibilitPs ch, $rowsCompatibilityCcm cm3)</li>
                         HTML;
+
+                        $compatibility = [];
+                        $compatibility["ID"] = $id;
+                        $compatibility["Marque"] = $rowsCompatibilityManufacturer;
+                        $compatibility["Modèle"] = $rowsCompatibilityModel . " (" .$rowsCompatibilityBjvon . " à " . $rowsCompatibilityBjbis . ")";
+                        $compatibility["Motorisation"] = $value[("TYPE")] . " - " . "(" . $value[("PS")] . "ch) " . "(" .$rowsCompatibilityBjvon . " à " . $rowsCompatibilityBjbis . ")";
+                        fputcsv($fpCompatibilityBuild, $compatibility, ";");
                     }
 
                     $getCompatibility.= <<<HTML
-                    </ul><br/>
-                    </div><br/>
+                    </ul>
+                    </div>
                     HTML;
 
                     // ******************************************* //
                     // ************** DEBUT - Ktype ************** //
-                    foreach ($rowsCompatibilityRaw as $compatibility) {
-                        fputcsv($fpCompatibilityBuild, $compatibility, ";", "\"");
-                    }
+/*                     foreach ($rowsCompatibilityRaw as $value) {
+                        $compatibility = [];
+                        $compatibility["ID"] = $id;
+                        $compatibility["Marque"] = $value[("MANUFACTURER")];
+                        $compatibility["Modèle"] = $value[("MODEL")];
+                        $compatibility["Motorisation"] = $value[("TYPE")] . " - " . $value[("PS")] . "ch";
+                        fputcsv($fpCompatibilityBuild, $compatibility, ";");
+                    } */
 
                     // ******************************************* //
                     // ***** DEBUT - Construction du fichier ***** //
@@ -264,7 +310,8 @@
                     $result[0]["reference_courte"] = $getMainInfo[0]["reference_courte"];
                     $result[0]["ean13"] = $getMainInfo[0]["ean13"];
                     $result[0]["caract_marque"] = $getCaractBrand;
-                    $result[0]["nom"] = $getMainInfo[0]["nom"] . " pour " . ucfirst(strtolower($result[0]["caract_marque"]));
+                    $result[0]["nom"] = substr($getMainInfo[0]["nom"] . " pour " . ucfirst(strtolower($result[0]["caract_marque"])), 0, $limitNom);
+                    $result[0]["url"] = generateSeoURL($result[0]["nom"], $limitUrl);
                     $result[0]["standard_group"] = $getMainInfo[0]["STANDARD_GROUP"];
                     $result[0]["assembly_group"] = $getMainInfo[0]["ASSEMBLY_GROUP"];
                     $result[0]["purpose_group"] = $getMainInfo[0]["PURPOSE_GROUP"];
@@ -282,23 +329,28 @@
                     $k = 0;
                     foreach ($data as $key => $item) {
                         if ($k++ < 5) {
+                            $final[0] = array_merge($result[0], $data);
                             continue;
+                        } else {
+                            $final[0] = array_merge($result[0], $data);
                         }
-                        $test[0] = array_merge($result[0], $data);
                     }
 
                     // Création des noms des colonnes au fichier CSV
-                    if ($row == 2) {
+                    if ($flag2) {
                         $fpProductsBuild = fopen("./export/products_build.csv", "w");
                         foreach ($result as $firstRow) {
                             $keys = array_keys($firstRow);
                             fputcsv($fpProductsBuild, $keys, ";", "\"");
                         }
+                        $flag2 = false;
                     }
 
                     // Enregistrement des données dans le fichier CSV
                     echo $row - 1 . "/" . $lineCount . " " . "\033[01;36mCorrespondance trouvée pour la référence " .$result[0]["reference"]. " de marque " .$result[0]["marque"]. "\n\033[0m";
-                    foreach ($test as $row2) {
+                    //print_r($final);die;
+                    foreach ($final as $row2) {
+                        //print_r($row2);die;
                         fputcsv($fpProductsBuild, $row2, ";", "\"");
                     }
                     // ****** FIN - Construction du fichier ****** //
