@@ -2,4 +2,6 @@
 *.log
 *.csv
 *.xlsx
+*.zip
 PIC_FILES/
+node_modules/

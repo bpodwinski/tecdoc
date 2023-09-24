@@ -1,0 +1,34 @@
+<?php
+include_once __DIR__ . "/../config.php";
+include_once __DIR__ . "/../model/database.php";
+
+global $langId;
+global $dlnr;
+
+$query = <<<SQL
+SELECT
+    GROUP_CONCAT(T.MANUFACTURER SEPARATOR ',') AS `caracteristique_marque`
+FROM (
+    -- PASSANGER
+    SELECT
+        GET_LBEZNR(T100.LBEZNR, $langId) AS MANUFACTURER
+    FROM `200_fixed` AS P
+        JOIN `400` AS T400 ON T400.ARTNR = P.ARTNR AND T400.DLNR = P.DLNR AND T400.VKNZIELART = 2
+        JOIN `120` AS T120 ON T120.KTYPNR = T400.VKNZIELNR
+        JOIN `110` AS T110 ON T110.KMODNR = T120.KMODNR
+        JOIN `100` AS T100 ON T100.HERNR = T110.HERNR
+    WHERE P.ARTNR_SHORT = CLEAN_NUMBER('.$id.') AND P.DLNR = $dlnr
+
+        UNION
+
+    -- TRUCK
+    SELECT
+        GET_LBEZNR(T100.LBEZNR, $langId) AS MANUFACTURER
+    FROM `200_fixed` AS P
+        JOIN `400` AS T400 ON T400.ARTNR = P.ARTNR AND T400.DLNR = P.DLNR AND T400.VKNZIELART = 16
+        JOIN `532` AS T532 ON T532.NTYPNR = T400.VKNZIELNR
+        JOIN `110` AS T110 ON T110.KMODNR = T532.KMODNR
+        JOIN `100` AS T100 ON T100.HERNR = T110.HERNR
+    WHERE P.ARTNR_SHORT = CLEAN_NUMBER('.$id.') AND P.DLNR = $dlnr
+    ) AS T
+SQL;
