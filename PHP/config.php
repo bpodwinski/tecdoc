@@ -18,7 +18,7 @@ $dbTecDocFullConfig = [
 
 // Global config
 $langId = 6;
-$csvPath = "./var/import/opa_tecdoc.csv";
+$csvPath = "./var/import/bf-first-equiv.csv";
 $pathToImage = "http://rzrb9611.odns.fr/img/";
 $pathToPdf = "http://rzrb9611.odns.fr/pdf/";
 $limitNom = 128;

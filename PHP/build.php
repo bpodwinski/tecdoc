@@ -3,6 +3,7 @@ $start_time = microtime(true);
 
 include_once __DIR__ . "/config.php";
 include_once __DIR__ . "/model/database.php";
+include_once __DIR__ . "/controller/errorController.php";
 include_once __DIR__ . "/controller/queryController.php";
 include_once __DIR__ . "/controller/modelController.php";
 include_once __DIR__ . "/controller/manufacturerController.php";
@@ -20,29 +21,29 @@ echo "\033[01;32m//* ***********************************************************
 if ($build_compatibility === true) {
     $fileCompatibilityBuild = "./var/export/build_compatibility.csv";
     if (!file_exists($fileCompatibilityBuild)) {
-        $fpCompatibilityBuild = fopen($fileCompatibilityBuild, 'w');
+        $fpCompatibilityBuild = fopen($fileCompatibilityBuild, "w");
         fputcsv($fpCompatibilityBuild, array("ID", "Marque", "Famille", "Modèle", "Motorisation"), ";");
     } else {
-        $fpCompatibilityBuild = fopen($fileCompatibilityBuild, 'a');
+        $fpCompatibilityBuild = fopen($fileCompatibilityBuild, "a");
     }
 }
 
 // Pour le fichier warning_ref_not_found.csv
-$fileRefNotFound = "./var/export/warning_ref_not_found.csv";
-if (!file_exists($fileRefNotFound)) {
-    $RefNotFound = fopen($fileRefNotFound, 'w');
-    fputcsv($RefNotFound, array("id", "référence", "marque"), ";", "\"");
+$fileProductNotFound = "./var/export/warning_ref_not_found.csv";
+if (!file_exists($fileProductNotFound)) {
+    $fpProductNotFound = fopen($fileProductNotFound, "w");
+    fputcsv($fpProductNotFound, array("id", "référence", "marque", "référence équivalente", "marque équivalente"), ";");
 } else {
-    $RefNotFound = fopen($fileRefNotFound, 'a');
+    $fpProductNotFound = fopen($fileProductNotFound, "a");
 }
 
 // Pour le fichier warning_brand_not_matched.csv
-$fileBrandNotMatched = './var/export/warning_brand_not_matched.csv';
+$fileBrandNotMatched = "./var/export/warning_brand_not_matched.csv";
 if (!file_exists($fileBrandNotMatched)) {
-    $fpBrandNotMatched = fopen($fileBrandNotMatched, 'w');
-    fputcsv($fpBrandNotMatched, array("id", "référence", "marque"), ";", "\"");
+    $fpBrandNotMatched = fopen($fileBrandNotMatched, "w");
+    fputcsv($fpBrandNotMatched, array("id", "référence", "marque", "référence équivalente", "marque équivalente"), ";");
 } else {
-    $fpBrandNotMatched = fopen($fileBrandNotMatched, 'a');
+    $fpBrandNotMatched = fopen($fileBrandNotMatched, "a");
 }
 
 // ****************************************** //
@@ -67,11 +68,11 @@ if (($handle = fopen($csvPath, "r")) !== FALSE) {
             $flag = false;
             continue;
         }
-        $id = $data[0];
-        $reference = $data[1];
-        $marque = $data[2];
+        $idProduct = $data[0];
+        $refProduct = $data[1];
+        $carPartsBrand = $data[2];
         $equivTecdocReference = $data[3];
-        $equivTecdocMarque = $data[4];
+        $equivTecdocBrand = $data[4];
 
         $row++;
         for ($i = 0; $i < 1; $i++) {
@@ -85,51 +86,49 @@ if (($handle = fopen($csvPath, "r")) !== FALSE) {
                 echo $row - 1 . "/" . $lineCount . " " . "\033[01;32mTemps écoulé depuis le début : $rounded_time secondes\n\033[0m";
             }
 
-            if ($marque == "Valéo") {
-                $marque = "VALEO";
+            if ($carPartsBrand == "Valéo") {
+                $carPartsBrand = "VALEO";
             }
 
             // Vérifie si une marque contient une erreur
-            // Minimisez l'utilisation de str_contains : Bien que str_contains soit une fonction rapide, elle est appelée à chaque itération. Si la condition qu'elle vérifie est rare (par exemple, une erreur dans une marque), vous pourriez envisager d'autres approches, comme le filtrage des données en amont.
-            if (str_contains($marque, "'")) {
-                error_log("\032[01;31mLa marque $marque contient une erreur de caractère sur le produit id $id\n\033[0m", 3, $logFile);
-                echo $row - 1 . "/" . $lineCount . " " . "\033[01;33mLa marque $marque contient une erreur de caractère sur le produit id $id\n\033[0m";
+            if (str_contains($carPartsBrand, "'")) {
+                displayError("Produit id %s : La marque $carPartsBrand contient une erreur de caractère");
                 continue;
             }
 
-            $stmtMappingBrand = $dbMappingBrand->prepare("SELECT DLNR, BRAND FROM brands WHERE BRAND='$marque'");
-            $stmtMappingBrand->execute();
+            $mappingCarPartsBrand = executeQuery("./model/getCarPartsBrand.php", $dbMappingBrand, $carPartsBrand);
+            $artnr = $refProduct;
 
-            while ($rowB = $stmtMappingBrand->fetch()) {
-                $dlnr = $rowB['DLNR'];
-                $brand = $rowB['BRAND'];
-                $artnr = $reference;
-                $id = $id;
-            }
-
-            // La marque ne match pas avec le catalogue TecDoc
-            if ($stmtMappingBrand->rowCount() === 0) {
+            // Aucune correspondance de la marque avec le catalogue TecDoc
+            if (empty($mappingCarPartsBrand)) {
 
                 // Alors on test avec les équivalences
-                $stmtMappingBrand = $dbMappingBrand->prepare("SELECT DLNR, BRAND FROM brands WHERE BRAND='$equivTecdocMarque'");
-                $stmtMappingBrand->execute();
+                $mappingCarPartsBrand = executeQuery("./model/getCarPartsBrand.php", $dbMappingBrand, $equivTecdocBrand);
+                $artnr = $equivTecdocReference;
 
-                while ($rowC = $stmtMappingBrand->fetch()) {
-                    $dlnr = $rowC['DLNR'];
-                    $brand = $rowC['BRAND'];
-                    $artnr = $equivTecdocReference;
-                    $id = $id;
-                }
+                // Aucune correspondance de la marque avec le catalogue TecDoc même avec les équivalences
+                if (empty($mappingCarPartsBrand)) {
+                    displayError("Produit id %s : La marque $carPartsBrand est introuvable");
 
-                // La marque ne match pas avec le catalogue TecDoc même avec les équivalences
-                if ($stmtMappingBrand->rowCount() === 0) {
-                    error_log("La marque $marque est introuvable pour le produit id $id\n", 3, $logFile);
-                    echo $row - 1 . "/" . $lineCount . " " . "\033[01;33mLa marque $marque est introuvable pour le produit id $id\n\033[0m";
+                    // On ajoute le produit au tableau warning_brand_not_matched.csv
+                    $brandNotMatched = [];
+                    $brandNotMatched["id"] = $idProduct;
+                    $brandNotMatched["référence"] = $refProduct;
+                    $brandNotMatched["marque"] = $carPartsBrand;
+                    $brandNotMatched["référence équivalente"] = $equivTecdocReference;
+                    $brandNotMatched["marque équivalente"] = $equivTecdocBrand;
+                    fputcsv($fpBrandNotMatched, $brandNotMatched, ";");
+
                     continue;
                 }
+            }
 
-                // Correspondence trouvée on construit les fichiers
-            } else {
+            // Correspondance trouvée on construit les fichiers
+            if (!empty($mappingCarPartsBrand)) {
+
+                $mappingCarPartsBrand = $mappingCarPartsBrand[0];
+                $dlnr = $mappingCarPartsBrand['DLNR'];
+                $brand = $mappingCarPartsBrand['BRAND'];
 
                 $productMainInfo = executeQuery("./model/getMainInfo.php", $dbTecDoc, $artnr);
                 $productsCompatibility = executeQuery("./model/getCompatibility.php", $dbTecDoc, $artnr);
@@ -142,8 +141,17 @@ if (($handle = fopen($csvPath, "r")) !== FALSE) {
                 $productCaractBrand = str_replace("VW", "VOLKSWAGEN", implode(" ", $productCaractBrand[0]));
 
                 if (empty($productMainInfo[0])) {
-                    error_log("Correspondance introuvable dans TecDoc pour le produit id $id\n", 3, $logFile);
-                    echo $row - 1 . "/" . $lineCount . " " . "\033[01;33mCorrespondance introuvable dans TecDoc pour le produit id $id\n\033[0m";
+                    displayError("Produit id %s : Correspondance introuvable dans TecDoc");
+
+                    // On ajoute le produit au tableau warning_ref_not_found.csv
+                    $productNotFound = [];
+                    $productNotFound["id"] = $idProduct;
+                    $productNotFound["référence"] = $refProduct;
+                    $productNotFound["marque"] = $carPartsBrand;
+                    $productNotFound["référence équivalente"] = $equivTecdocReference;
+                    $productNotFound["marque équivalente"] = $equivTecdocBrand;
+                    fputcsv($fpProductNotFound, $productNotFound, ";");
+
                     continue;
                 }
 
@@ -221,7 +229,7 @@ if (($handle = fopen($csvPath, "r")) !== FALSE) {
                     if ($build_compatibility === true) {
                         $modelCar = getModel($productCompatibility);
                         $compatibility = [];
-                        $compatibility["ID"] = $id;
+                        $compatibility["ID"] = $idProduct;
                         $compatibility["Marque"] = $sanitizeManufacturer["NAME"];
                         $compatibility["Famille"] = $productCompatibilityFamille[0];
                         $compatibility["Modèle"] = str_replace("_", "", $modelCar["MODEL"]) . " (" . $modelCar["BJVON"] . " à " . $modelCar["BJBIS"] . ")";
@@ -238,11 +246,11 @@ if (($handle = fopen($csvPath, "r")) !== FALSE) {
                 // ******************************************* //
                 // ***** DEBUT - Construction du fichier ***** //
                 $result = [];
-                $result[0]["id"] = $id;
-                $result[0]["reference"] = $reference;
-                $result[0]["marque"] = $marque;
+                $result[0]["id"] = $idProduct;
+                $result[0]["reference"] = $refProduct;
+                $result[0]["marque"] = $carPartsBrand;
                 $result[0]["equivTecdocReference"] = $equivTecdocReference;
-                $result[0]["equivTecdocMarque"] = $equivTecdocMarque;
+                $result[0]["equivTecdocMarque"] = $equivTecdocBrand;
                 $result[0]["marqueTecDoc"] = $brand;
                 $result[0]["reference2"] = $productMainInfo[0]["reference"];
                 $result[0]["reference_courte"] = $productMainInfo[0]["reference_courte"];
@@ -293,6 +301,10 @@ if (($handle = fopen($csvPath, "r")) !== FALSE) {
         }
     }
     fclose($handle);
+
+    $elapsed_time = microtime(true) - $start_time;
+    $rounded_time = round($elapsed_time);
+
     echo "\033[01;32m\n//* ******************************************************************* *//\n\033[0m";
     echo "\033[01;32m//* ************************** FIN DU SCRIPT ************************** *//\n\033[0m";
     echo "\033[01;32m Temps total écoulé : $rounded_time secondes\033[0m";

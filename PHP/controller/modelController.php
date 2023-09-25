@@ -18,6 +18,7 @@ function getModel(array $data): array
     $stmtModelCarRawMult = executeQuery($pathgetModelsCar, $dbTecDoc, $modelId);
     $stmtModelCarRaw = $stmtModelCarRawMult[0];
 
+    $stmtModelCarRaw["MODEL"] = str_replace("_", "", $stmtModelCarRaw["MODEL"]);
     $stmtModelCarRaw["BJVON"] = formatDateBjvon($stmtModelCarRaw["BJVON"]);
     $stmtModelCarRaw["BJBIS"] = formatDateBjbis($stmtModelCarRaw["BJBIS"]);
 

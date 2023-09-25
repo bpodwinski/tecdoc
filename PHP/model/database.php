@@ -7,7 +7,8 @@ include_once __DIR__ . "/../config.php";
  * @param string $dbName Le nom de la base de données à connecter ("MappingBrand" ou "TecDoc").
  * @return PDO|null Instance PDO de la connexion ou null en cas d'erreur.
  */
-function connectDatabase($dbName) {
+function connectDatabase($dbName)
+{
     global $dbMappingConfig, $dbTecDocFullConfig;
 
     switch ($dbName) {
