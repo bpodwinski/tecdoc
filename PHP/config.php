@@ -1,26 +1,26 @@
 ﻿<?php
 
 $dbMappingConfig = [
-    'host' => "192.168.1.101",
+    'host' => "127.0.0.1",
     'port' => 3307,
     'name' => "tecdoc_mapping_brand",
     'user' => "root",
-    'password' => "824688Ygg"
+    'password' => "***"
 ];
 
 $dbTecDocFullConfig = [
-    'host' => "192.168.1.101",
+    'host' => "127.0.0.1",
     'port' => 3307,
     'name' => "tecdoc_full",
     'user' => "root",
-    'password' => "824688Ygg"
+    'password' => "***"
 ];
 
 // Global config
 $langId = 6;
-$csvPath = "./var/import/bf-first-equiv.csv";
-$pathToImage = "http://rzrb9611.odns.fr/img/";
-$pathToPdf = "http://rzrb9611.odns.fr/pdf/";
+$csvPath = "./var/import/first-equiv.csv";
+$pathToImage = "http://***/img/";
+$pathToPdf = "http://***/pdf/";
 $limitNom = 128;
 $limitUrl = 128;
 $tva = 20;
